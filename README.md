@@ -37,13 +37,16 @@ Scoring latency: not run.
 
 Install with `uv sync`. Each script writes a JSON file into `results/`.
 
+- Data profile, after download: `uv run python scripts/profile.py` writes `results/data_profile.json`.
+
 - Tier 1, XGBoost with and without graph features: `uv run python scripts/run_tier1.py`
 - Tier 2, heterogeneous GNN: `uv run python scripts/run_gnn.py`
 - Tier 4, card-history transformer: `uv run python scripts/run_seq.py`
-- Online path: `uv run python scripts/replay.py` runs the weekly drift replay through the serving store.
+- Tier 3, serving and monitoring: `uv run python scripts/replay.py` runs the weekly drift replay through
+  the online store. It needs `models/xgb_graph.ubj` and its `.features.json` from `run_tier1.py` first.
   `uv run python scripts/replay.py --dump-payloads N` writes the k6 payloads. Start the service with
-  `FRAUDGRAPH_MODEL=models/xgb_graph.ubj uv run uvicorn fraudgraph.serve.app:app`, then run
-  `k6 run --summary-export results/latency.json bench/score.k6.js`.
+  `FRAUDGRAPH_MODEL=models/xgb_graph.ubj uv run uvicorn fraudgraph.serve.app:app`; it exposes Prometheus
+  metrics at `/metrics`. Then run `k6 run --summary-export results/latency.json bench/score.k6.js`.
 - Report: `uv run python scripts/report.py` refreshes the block above.
 - Tests: `uv run pytest -q` (uses a synthetic fixture, no data needed).
 
