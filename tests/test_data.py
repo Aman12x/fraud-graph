@@ -35,3 +35,4 @@ def test_fixture_shape_for_later_tasks(raw_dir):
     a = df[df.card1 == 1111]
     fraud_day = a[a.isFraud == 1].day.min()
     assert (a.day >= fraud_day + 31).any()
+    assert df.day.max() - df.day.min() >= 170
