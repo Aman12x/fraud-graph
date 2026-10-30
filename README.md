@@ -32,8 +32,10 @@ Scoring latency: not run.
 ## Get the data
 
 1. Accept the competition rules on the Kaggle page for `ieee-fraud-detection` (downloads fail until you do).
-2. Put your API token at `~/.kaggle/kaggle.json`.
-3. Run `scripts/download.sh`. It fetches and unzips into `data/raw/`, which is never committed.
+2. Put your API token at `~/.kaggle/kaggle.json` (`chmod 600` it).
+3. Run `uv sync`. The `kaggle` CLI is a pinned dev dependency, so nothing is installed globally.
+4. Run `scripts/download.sh` from anywhere. It calls `uv run kaggle`, then unzips every downloaded zip into
+   `data/raw/`, which is never committed.
 
 ## Run
 
