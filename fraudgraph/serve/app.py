@@ -54,9 +54,21 @@ class Label(BaseModel):
     isFraud: bool
 
 
-def create_app(model, store: EntityStore, feature_columns_: list[str]) -> FastAPI:
+def tabular_part(feature_columns_: list[str]) -> list[str]:
     graph_cols = set(feature_columns())
-    tab_cols = [c for c in feature_columns_ if c not in graph_cols]
+    return [c for c in feature_columns_ if c not in graph_cols]
+
+
+def feature_vector(store: EntityStore, txn: dict, tab_cols: list[str],
+                   feature_columns_: list[str]) -> pd.DataFrame:
+    """One-row model input from a raw txn and the store's state strictly before it."""
+    tab = tabular_features(pd.DataFrame([txn]), columns=tab_cols)
+    graph = pd.DataFrame([store.features(txn)])
+    return pd.concat([tab, graph], axis=1).reindex(columns=feature_columns_)
+
+
+def create_app(model, store: EntityStore, feature_columns_: list[str]) -> FastAPI:
+    tab_cols = tabular_part(feature_columns_)
     lock = threading.Lock()  # store state and the DT ordering are not safe to interleave
     registry = CollectorRegistry()
     latency = Histogram("score_latency_seconds", "Time to build features and score one txn",
@@ -65,9 +77,7 @@ def create_app(model, store: EntityStore, feature_columns_: list[str]) -> FastAP
     app = FastAPI(title="fraud-graph scoring")
 
     def vector(txn: dict) -> pd.DataFrame:
-        tab = tabular_features(pd.DataFrame([txn]), columns=tab_cols)
-        graph = pd.DataFrame([store.features(txn)])
-        return pd.concat([tab, graph], axis=1).reindex(columns=feature_columns_)
+        return feature_vector(store, txn, tab_cols, feature_columns_)
 
     @app.post("/score")
     def score(t: Txn):
