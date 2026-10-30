@@ -21,6 +21,26 @@ def test_day_column(raw_dir):
     assert (df.day == df.TransactionDT // 86400).all()
 
 
+def test_identity_coverage_is_join_coverage(raw_dir):
+    tx = pd.read_csv(raw_dir / "train_transaction.csv")
+    ident = pd.read_csv(raw_dir / "train_identity.csv")
+    assert ident.DeviceType.isna().any(), "fixture needs an identity row with null DeviceType"
+    df = load_raw(raw_dir)
+    want = tx.TransactionID.isin(ident.TransactionID).mean()
+    assert 0.45 < want < 0.55  # identity for half the transactions
+    assert profile(df)["identity_coverage"] == want
+    assert profile(df)["identity_coverage"] > df.DeviceType.notna().mean()
+    assert list(df.columns) == [*tx.columns, *[c for c in ident.columns if c != "TransactionID"], "day"]
+
+
+def test_profile_refuses_frame_without_join_info(raw_dir):
+    import pytest
+    df = load_raw(raw_dir)
+    df.attrs.clear()
+    with pytest.raises(ValueError, match="load_raw"):
+        profile(df)
+
+
 def test_profile_keys(raw_dir):
     p = profile(load_raw(raw_dir))
     assert set(p) == {"rows", "fraud_rate", "identity_coverage", "day_min", "day_max"}

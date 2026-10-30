@@ -57,7 +57,8 @@ def raw_dir(tmp_path):
     ids = tx.TransactionID.iloc[::2]
     ident = pd.DataFrame({
         "TransactionID": ids.values,
-        "DeviceType": ["mobile", "desktop"] * (len(ids) // 2) + (["mobile"] if len(ids) % 2 else []),
+        # the first identity row has a null DeviceType: identity exists, the field does not
+        "DeviceType": [None if i == 0 else ("mobile", "desktop")[i % 2] for i in range(len(ids))],
         # a small pool so device links repeat; every 7th identity row has no DeviceInfo
         "DeviceInfo": [None if i % 7 == 6 else f"dev{i % 12}" for i in range(len(ids))],
     })
