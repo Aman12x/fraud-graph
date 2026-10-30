@@ -82,14 +82,11 @@ def test_wide_single_row_emits_no_performance_warning():
 
 def test_wide_cost_does_not_grow_per_column():
     # one block build, not one insert per column: 400 columns cost far less than 10x 40 columns
-    import time
 
-    def per_call(n):
+    import timeit
+
+    def per_call(n):  # best of 3 repeats, so one noisy CI slice can't fail it (measured ratio ~1.6)
         one, cols = _wide_payload(n, n_null=2)
-        tabular_features(one, columns=cols)
-        t = time.perf_counter()
-        for _ in range(20):
-            tabular_features(one, columns=cols)
-        return time.perf_counter() - t
+        return min(timeit.repeat(lambda: tabular_features(one, columns=cols), number=20, repeat=3))
 
     assert per_call(400) < 5 * per_call(40)
