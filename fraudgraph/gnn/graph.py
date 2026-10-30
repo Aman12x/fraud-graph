@@ -35,11 +35,13 @@ def standardize(X: np.ndarray, fit_rows=None) -> np.ndarray:
     return out
 
 
-def build_hetero(df: pd.DataFrame, keys: pd.DataFrame, X: np.ndarray, fit_rows=None) -> HeteroData:
+def build_hetero(df: pd.DataFrame, keys: pd.DataFrame, X: np.ndarray, *,
+                 fit_rows) -> HeteroData:
     """Transactions (row order of df) linked to one node per distinct non-null entity key.
 
-    X is the numeric feature matrix aligned with df; it is standardized with stats over
-    `fit_rows` (all rows by default; pass the train mask to avoid fitting on val/test).
+    X is the RAW numeric feature matrix aligned with df (do not pre-standardize it); it is
+    standardized exactly once here, with stats over `fit_rows` (required, e.g. the train
+    mask, so val/test statistics never reach the features).
     """
     if len(X) != len(df) or len(keys) != len(df):
         raise ValueError("df, keys and X must have the same number of rows")
@@ -63,11 +65,17 @@ def build_hetero(df: pd.DataFrame, keys: pd.DataFrame, X: np.ndarray, fit_rows=N
 
 def make_loader(data: HeteroData, seed_idx, batch_size: int = 1024,
                 num_neighbors=(15, 10), shuffle: bool = False) -> NeighborLoader:
-    """Per-seed (disjoint) temporal subgraphs: only transactions with time <= seed time."""
+    """Per-seed (disjoint) temporal subgraphs: only transactions with time <= seed time.
+
+    seed_idx is an index array or a boolean mask over txn nodes.
+    """
+    seeds = torch.as_tensor(np.asarray(seed_idx))
+    if seeds.dtype == torch.bool:
+        seeds = seeds.nonzero().flatten()
     return NeighborLoader(
         data,
         num_neighbors=list(num_neighbors),
-        input_nodes=("txn", torch.as_tensor(seed_idx, dtype=torch.long)),
+        input_nodes=("txn", seeds.long()),
         batch_size=batch_size,
         shuffle=shuffle,
         time_attr="time",

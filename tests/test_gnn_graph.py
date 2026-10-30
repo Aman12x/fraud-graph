@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 import torch
 
 from fraudgraph.data import load_raw
@@ -12,7 +13,8 @@ def _build(raw_dir, flip_labels=False):
     if flip_labels:
         df = df.assign(isFraud=1 - df["isFraud"])
     tab = tabular_features(df)
-    return df, tab, build_hetero(df, entity_keys(df), tab.to_numpy(dtype=float))
+    return df, tab, build_hetero(df, entity_keys(df), tab.to_numpy(dtype=float),
+                                 fit_rows=np.ones(len(df), dtype=bool))
 
 
 def test_no_label_in_features(raw_dir):
@@ -69,3 +71,32 @@ def test_standardize_fits_on_given_rows():
     assert out[1, 1] == 0.0          # NaN -> 0 after standardizing
     assert out[0, 1] == 0.0          # zero-variance column does not divide by zero
     assert not np.isnan(out).any()
+
+
+def test_build_hetero_standardizes_once_on_fit_rows(raw_dir):
+    df = load_raw(raw_dir)
+    X = tabular_features(df).to_numpy(dtype=float)
+    train = (df["day"] < 100).to_numpy()
+    data = build_hetero(df, entity_keys(df), X, fit_rows=train)
+    expected = torch.as_tensor(standardize(X, train), dtype=torch.float)
+    assert torch.equal(data["txn"].x, expected)
+    # differs from an all-rows fit, so the train-only stats really were used
+    assert not torch.equal(data["txn"].x, torch.as_tensor(standardize(X), dtype=torch.float))
+    with pytest.raises(TypeError):
+        build_hetero(df, entity_keys(df), X)
+
+
+def test_mask_and_index_seeds_match(raw_dir):
+    _, _, data = _build(raw_dir)
+    n = data["txn"].num_nodes
+    mask = np.zeros(n, dtype=bool)
+    mask[[2, 5, 7, 40, n - 1]] = True
+
+    def seed_ids(seed_idx):
+        out = []
+        for b in make_loader(data, seed_idx, batch_size=2):
+            out += b["txn"].n_id[:b["txn"].batch_size].tolist()
+        return out
+
+    assert seed_ids(mask) == seed_ids(np.flatnonzero(mask)) == [2, 5, 7, 40, n - 1]
+    assert seed_ids(torch.as_tensor(mask)) == [2, 5, 7, 40, n - 1]
