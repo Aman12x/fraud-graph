@@ -8,6 +8,11 @@ dependencies = [
     "pyarrow==18.1.0",
     "scikit-learn>=1.9.1",
     "xgboost>=3.2.0",
+    "torch==2.8.0",
+    "torch-geometric==2.7.0",
+    # same release; PyG tags the macOS wheel +pt28 and the linux/windows wheels +pt28cpu
+    "pyg-lib==0.6.0+pt28 ; sys_platform == 'darwin'",
+    "pyg-lib==0.6.0+pt28cpu ; sys_platform != 'darwin'",
 ]
 
 [dependency-groups]
@@ -17,9 +22,36 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+filterwarnings = [
+    # torch_geometric 2.7.0 imports its own deprecated distributed module at import time
+    "ignore:`torch_geometric.distributed` has been deprecated:DeprecationWarning",
+]
 
 [tool.setuptools]
-packages = ["fraudgraph", "fraudgraph.models"]
+packages = ["fraudgraph", "fraudgraph.models", "fraudgraph.gnn"]
+
+# CPU-only torch (no CUDA wheels on linux) and pyg-lib from PyG's flat wheel index.
+# torch 2.8.0 + pyg-lib 0.6.0+pt28 have wheels for both macOS arm64 and linux x86_64.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pyg"
+url = "https://data.pyg.org/whl/torch-2.8.0+cpu.html"
+format = "flat"
+explicit = true
+
+[tool.uv]
+required-environments = [
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+pyg-lib = { index = "pyg" }
 
 [build-system]
 requires = ["setuptools>=68"]
