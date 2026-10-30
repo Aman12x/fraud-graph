@@ -41,26 +41,38 @@ def _replay_rows(df, store, model, cols, tab_cols, score_mask, chunk):
     """Replay rows through the store in time order; score the masked rows one chunk at a time.
 
     Per row, in order: store.features (state strictly before the row), observe, ingest_label,
-    exactly as one /score + /label call would. Predictions never touch the store, so the
-    masked rows' features are collected and scored with one predict_proba per chunk value.
+    exactly as one /score + /label call would. Predictions never touch the store, so a chunk's
+    masked rows are collected and scored with one predict_proba when the chunk key changes.
+    `chunk` must be non-decreasing (week = day // 7 over time-sorted rows), so one chunk is
+    held in memory at a time.
     """
-    bodies, graph_rows, keys = [], [], []
+    scores: list[np.ndarray] = []
+    bodies: list[dict] = []
+    graph_rows: list[dict] = []
+
+    def flush():
+        if bodies:
+            x = feature_frame(bodies, graph_rows, tab_cols, cols)
+            scores.append(model.predict_proba(x)[:, 1])
+            bodies.clear()
+            graph_rows.clear()
+
+    prev = None
     for rec, want, k in zip(df.to_dict("records"), score_mask, chunk):
+        if prev is not None and k < prev:
+            raise ValueError("chunk keys must be non-decreasing (rows in time order)")
+        if k != prev:
+            flush()
+            prev = k
         body = txn_body(rec)
         g = store.features(body)
         if want:
             bodies.append(body)
             graph_rows.append(g)
-            keys.append(k)
         store.observe(body)
         store.ingest_label(body["TransactionID"], bool(rec["isFraud"]))
-    keys = np.asarray(keys)
-    scores = np.empty(len(bodies))
-    for k in dict.fromkeys(keys.tolist()):
-        idx = np.flatnonzero(keys == k)
-        x = feature_frame([bodies[i] for i in idx], [graph_rows[i] for i in idx], tab_cols, cols)
-        scores[idx] = model.predict_proba(x)[:, 1]
-    return scores
+    flush()
+    return np.concatenate(scores) if scores else np.empty(0)
 
 
 def run(df: pd.DataFrame, model, feature_columns: list[str]) -> list[dict]:
