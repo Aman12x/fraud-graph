@@ -22,11 +22,11 @@ def test_render_uses_json_values():
         "xgb_graph": {"test": _ev(None, 0.5, 999.0)},
         "drift": {"weeks": [{"week": 3, "n": 777, "psi": 0.1234, "pr_auc": None}]},
         "latency": {"metrics": {"http_req_duration": {"med": 4.25, "p(95)": 9.75},
-                                "http_reqs": {"count": 4321}}},
+                                "http_reqs": {"count": 4321, "rate": 71.25}}},
     }
     out = report.render(r)
     for s in ("590,540", "0.0349", "0.457", "0.322", "$12,346", "n/a", "$999", "777", "0.123",
-              "4.2", "9.8", "4321", "constant TransactionDT"):
+              "4.2", "9.8", "4321", "constant TransactionDT", "71.2 req/s", "mostly queueing"):
         assert s in out, s
     assert "| gnn_sage | not run |" in out
     assert "expected cost (val-chosen threshold)" in out and "oracle cost" in out

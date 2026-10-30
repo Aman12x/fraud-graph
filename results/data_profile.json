@@ -1,0 +1,9 @@
+{
+  "created_at": "2026-10-30T03:48:09.431145+00:00",
+  "day_max": 182,
+  "day_min": 1,
+  "fraud_rate": 0.03499000914417313,
+  "git_sha": "00feefe",
+  "identity_coverage": 0.2442391709283029,
+  "rows": 590540
+}

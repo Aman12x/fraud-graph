@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Fetch the IEEE-CIS competition files into data/raw/ (never committed).
-# Needs: competition rules accepted on Kaggle, and an API token at ~/.kaggle/kaggle.json.
+# Needs: competition rules accepted on Kaggle, and an API token in ~/.kaggle/access_token (or KAGGLE_API_TOKEN).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p data/raw

@@ -15,24 +15,32 @@ Every number below is rendered from `results/*.json` by `scripts/report.py`. Not
 The headline cost applies the threshold that minimised expected cost on the validation weeks to the test weeks. The oracle column picks its threshold on the test labels themselves, so it is the floor for that model's scores, reachable only with hindsight; it is shown only for comparison.
 
 <!-- results:start -->
-Data profile: not run.
+Data profile: 590,540 rows, fraud rate 0.0350, identity coverage 0.244, days 1 to 182.
 
 | model | test PR-AUC | recall @ 1% FPR | expected cost (val-chosen threshold) | oracle cost (threshold tuned on test; not achievable) |
 |---|---|---|---|---|
-| xgb_base | not run | not run | not run | not run |
-| xgb_graph | not run | not run | not run | not run |
-| gnn_sage | not run | not run | not run | not run |
-| seq_transformer | not run | not run | not run | not run |
+| xgb_base | 0.477 | 0.406 | $251,728 | $243,934 |
+| xgb_graph | 0.482 | 0.401 | $253,238 | $243,868 |
+| gnn_sage | 0.380 | 0.312 | $300,358 | $296,809 |
+| seq_transformer | 0.364 | 0.307 | $298,626 | $286,163 |
 
-Drift: not run.
+| week | n | PSI | PR-AUC |
+|---|---|---|---|
+| 20 | 12831 | 0.007 | 0.437 |
+| 21 | 20378 | 0.003 | 0.482 |
+| 22 | 20740 | 0.001 | 0.470 |
+| 23 | 20944 | 0.008 | 0.428 |
+| 24 | 20206 | 0.014 | 0.521 |
+| 25 | 17681 | 0.005 | 0.524 |
+| 26 | 2754 | 0.006 | 0.624 |
 
-Scoring latency: not run.
+Scoring latency (k6, POST /score): p50 350.1 ms, p95 679.8 ms over 4276 requests (70.4 req/s). Caveats: one uvicorn worker serialises requests through the feature-store lock, so under up to 50 concurrent users these latencies are mostly queueing, not per-request work; and the benchmark uses a constant TransactionDT, so every request sees zero prior-neighbour counts and the latency excludes real neighbour-count work.
 <!-- results:end -->
 
 ## Get the data
 
 1. Accept the competition rules on the Kaggle page for `ieee-fraud-detection` (downloads fail until you do).
-2. Put your API token at `~/.kaggle/kaggle.json` (`chmod 600` it).
+2. Generate an API token at kaggle.com/settings/api and save it to `~/.kaggle/access_token` (`chmod 600` it), or export it as `KAGGLE_API_TOKEN`.
 3. Run `uv sync`. The `kaggle` CLI is a pinned dev dependency, so nothing is installed globally.
 4. Run `scripts/download.sh` from anywhere. It calls `uv run kaggle`, then unzips every downloaded zip into
    `data/raw/`, which is never committed.

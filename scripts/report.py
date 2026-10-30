@@ -56,10 +56,14 @@ def _latency(r: dict) -> str:
         return f"Scoring latency: {NOT_RUN}."
     m = lat["metrics"]
     dur = m["http_req_duration"]
+    r = m["http_reqs"].get("rate")
+    rate = f" ({r:.1f} req/s)" if r is not None else ""
     return (f"Scoring latency (k6, POST /score): p50 {dur['med']:.1f} ms, p95 {dur['p(95)']:.1f} ms "
-            f"over {int(m['http_reqs']['count'])} requests. Caveat: the benchmark uses a constant "
-            "TransactionDT, so every request sees zero prior-neighbour counts and the latency "
-            "excludes real neighbour-count work.")
+            f"over {int(m['http_reqs']['count'])} requests{rate}. Caveats: one uvicorn worker "
+            "serialises requests through the feature-store lock, so under up to 50 concurrent users "
+            "these latencies are mostly queueing, not per-request work; and the benchmark uses a "
+            "constant TransactionDT, so every request sees zero prior-neighbour counts and the "
+            "latency excludes real neighbour-count work.")
 
 
 def render(r: dict) -> str:
