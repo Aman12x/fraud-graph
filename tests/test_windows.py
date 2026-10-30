@@ -63,3 +63,19 @@ def test_non_range_index_and_dtype():
     hist, mask = _run([(1, 10), (1, 20)], index=[50, 7])
     assert hist.dtype == np.float32
     assert (~mask[1]).sum() == 1 and mask[0].all()
+
+
+def test_card_windows_matches_index_gather():
+    from fraudgraph.seq.windows import card_window_index
+    rows = [(1, 30), (1, 10), (None, 15), (1, 20), (2, 20), (1, 20), (1, 40)]
+    df = _frame(rows)
+    keys = entity_keys(df)
+    X = np.arange(len(df) * 2, dtype=float).reshape(-1, 2) + 1.0
+    hist, mask = card_windows(df, keys, X, k=4)
+    idx, gap = card_window_index(df, keys, k=4)
+    assert idx.dtype == np.int64 and gap.dtype == np.float32
+    np.testing.assert_array_equal(mask, idx < 0)
+    g = np.concatenate([X.astype(np.float32)[np.where(idx < 0, 0, idx)], gap[..., None]], axis=2)
+    g[idx < 0] = 0.0
+    np.testing.assert_array_equal(hist, g)
+    assert (gap[idx < 0] == 0).all()
