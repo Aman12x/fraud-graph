@@ -3,3 +3,7 @@ data/
 *.pt
 *.ubj
 __pycache__/
+.superpowers/
+*.egg-info/
+/models/
+bench/payloads.json

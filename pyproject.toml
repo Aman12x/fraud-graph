@@ -1,0 +1,65 @@
+[project]
+name = "fraudgraph"
+version = "0.1.0"
+description = "Delayed-label payment-fraud benchmark on IEEE-CIS"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "pandas==2.2.3",
+    "pyarrow==18.1.0",
+    "scikit-learn>=1.9.1",
+    "xgboost>=3.2.0",
+    "torch==2.8.0",
+    "torch-geometric==2.7.0",
+    # same release; PyG tags the macOS wheel +pt28 and the linux/windows wheels +pt28cpu
+    "pyg-lib==0.6.0+pt28 ; sys_platform == 'darwin'",
+    "pyg-lib==0.6.0+pt28cpu ; sys_platform != 'darwin'",
+    "fastapi>=0.162.0",
+    "uvicorn>=0.54.0",
+    "httpx>=0.28.1",
+    "prometheus-client>=0.26.0",
+]
+
+[dependency-groups]
+dev = [
+    "kaggle==2.2.5",
+    "pytest==8.3.4",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = [
+    # torch_geometric 2.7.0 imports its own deprecated distributed module at import time
+    "ignore:`torch_geometric.distributed` has been deprecated:DeprecationWarning",
+    # starlette's TestClient prefers httpx2; the brief pins httpx
+    "ignore:Using `httpx` with `starlette.testclient`",
+]
+
+[tool.setuptools.packages.find]
+include = ["fraudgraph*"]
+
+# CPU-only torch (no CUDA wheels on linux) and pyg-lib from PyG's flat wheel index.
+# torch 2.8.0 + pyg-lib 0.6.0+pt28 have wheels for both macOS arm64 and linux x86_64.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pyg"
+url = "https://data.pyg.org/whl/torch-2.8.0+cpu.html"
+format = "flat"
+explicit = true
+
+[tool.uv]
+required-environments = [
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+pyg-lib = { index = "pyg" }
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
