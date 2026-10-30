@@ -1,0 +1,24 @@
+[project]
+name = "fraudgraph"
+version = "0.1.0"
+description = "Delayed-label payment-fraud benchmark on IEEE-CIS"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "pandas==2.2.3",
+    "pyarrow==18.1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==8.3.4",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools]
+packages = ["fraudgraph"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

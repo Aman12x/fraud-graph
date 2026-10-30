@@ -4,3 +4,4 @@ data/
 *.ubj
 __pycache__/
 .superpowers/
+*.egg-info/
