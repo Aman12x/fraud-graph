@@ -41,6 +41,13 @@ def test_profile_refuses_frame_without_join_info(raw_dir):
         profile(df)
 
 
+def test_profile_refuses_a_slice_of_the_loaded_frame(raw_dir):
+    # pandas carries attrs onto slices, so the full-frame coverage must not be reported for a subset
+    import pytest
+    with pytest.raises(ValueError, match="load_raw"):
+        profile(load_raw(raw_dir).iloc[:50])
+
+
 def test_profile_keys(raw_dir):
     p = profile(load_raw(raw_dir))
     assert set(p) == {"rows", "fraud_rate", "identity_coverage", "day_min", "day_max"}
