@@ -8,11 +8,10 @@ import pandas as pd
 import fraudgraph.results as results
 from fraudgraph.data import load_raw
 from fraudgraph.entities import entity_keys
+from fraudgraph.experiment import prepare
 from fraudgraph.graph_features import graph_features
 from fraudgraph.metrics import evaluate
 from fraudgraph.models.xgb import save_model, train_xgb
-from fraudgraph.splits import label_known, make_splits, split_masks
-from fraudgraph.tabular import tabular_features
 
 ROOT = Path(__file__).resolve().parent.parent
 MODELS_DIR = ROOT / "models"
@@ -21,12 +20,8 @@ MODELS_DIR = ROOT / "models"
 def run(df: pd.DataFrame, models_dir: Path | None = None, n_estimators: int = 2000) -> dict[str, dict]:
     models_dir = Path(models_dir) if models_dir is not None else MODELS_DIR
     models_dir.mkdir(parents=True, exist_ok=True)
-    s = make_splits(df)
-    train_m, val_m, test_m = split_masks(df, s)
-    train_fit = train_m & label_known(df, s.train_end_day)
-
-    tab_cols = list(tabular_features(df[train_m]).columns)
-    tab = tabular_features(df, columns=tab_cols)
+    prep = prepare(df)
+    val_m, test_m, train_fit, tab = prep.val, prep.test, prep.train_fit, prep.tab
     graph = graph_features(df, entity_keys(df))  # point-in-time by construction
     full = pd.concat([tab, graph], axis=1)
     frames = {"xgb_base": tab, "xgb_graph": full}
