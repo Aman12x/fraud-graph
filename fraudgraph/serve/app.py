@@ -59,12 +59,18 @@ def tabular_part(feature_columns_: list[str]) -> list[str]:
     return [c for c in feature_columns_ if c not in graph_cols]
 
 
+def feature_frame(txns: list[dict], graph_rows: list[dict], tab_cols: list[str],
+                  feature_columns_: list[str]) -> pd.DataFrame:
+    """Model input for raw txns plus their store.features() rows (one row each, same order)."""
+    tab = tabular_features(pd.DataFrame(txns), columns=tab_cols)
+    graph = pd.DataFrame(graph_rows, index=tab.index)
+    return pd.concat([tab, graph], axis=1).reindex(columns=feature_columns_)
+
+
 def feature_vector(store: EntityStore, txn: dict, tab_cols: list[str],
                    feature_columns_: list[str]) -> pd.DataFrame:
     """One-row model input from a raw txn and the store's state strictly before it."""
-    tab = tabular_features(pd.DataFrame([txn]), columns=tab_cols)
-    graph = pd.DataFrame([store.features(txn)])
-    return pd.concat([tab, graph], axis=1).reindex(columns=feature_columns_)
+    return feature_frame([txn], [store.features(txn)], tab_cols, feature_columns_)
 
 
 def create_app(model, store: EntityStore, feature_columns_: list[str]) -> FastAPI:

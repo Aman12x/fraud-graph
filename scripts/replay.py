@@ -3,6 +3,7 @@
 Every pre-test row (train + val) is replayed through EntityStore in time order
 (features -> score -> observe -> ingest_label) so live state matches offline. Val scores from
 that pass are the PSI reference. Then each test week (day // 7) is scored the same way.
+Features are built row by row through the store; scoring is batched, one predict_proba per week.
 """
 import argparse
 import json
@@ -17,7 +18,7 @@ from fraudgraph.data import load_raw
 from fraudgraph.drift import psi
 from fraudgraph.metrics import pr_auc
 from fraudgraph.models.xgb import load_model
-from fraudgraph.serve.app import feature_vector, tabular_part
+from fraudgraph.serve.app import feature_frame, tabular_part
 from fraudgraph.serve.store import EntityStore
 from fraudgraph.splits import make_splits, split_masks
 
@@ -36,16 +37,30 @@ def txn_body(rec: dict) -> dict:
     return out
 
 
-def _replay_rows(df, store, model, cols, tab_cols, score_mask):
-    scores = []
-    for rec, want in zip(df.to_dict("records"), score_mask):
+def _replay_rows(df, store, model, cols, tab_cols, score_mask, chunk):
+    """Replay rows through the store in time order; score the masked rows one chunk at a time.
+
+    Per row, in order: store.features (state strictly before the row), observe, ingest_label,
+    exactly as one /score + /label call would. Predictions never touch the store, so the
+    masked rows' features are collected and scored with one predict_proba per chunk value.
+    """
+    bodies, graph_rows, keys = [], [], []
+    for rec, want, k in zip(df.to_dict("records"), score_mask, chunk):
         body = txn_body(rec)
-        x = feature_vector(store, body, tab_cols, cols)
+        g = store.features(body)
         if want:
-            scores.append(float(model.predict_proba(x)[0, 1]))
+            bodies.append(body)
+            graph_rows.append(g)
+            keys.append(k)
         store.observe(body)
         store.ingest_label(body["TransactionID"], bool(rec["isFraud"]))
-    return np.array(scores)
+    keys = np.asarray(keys)
+    scores = np.empty(len(bodies))
+    for k in dict.fromkeys(keys.tolist()):
+        idx = np.flatnonzero(keys == k)
+        x = feature_frame([bodies[i] for i in idx], [graph_rows[i] for i in idx], tab_cols, cols)
+        scores[idx] = model.predict_proba(x)[:, 1]
+    return scores
 
 
 def run(df: pd.DataFrame, model, feature_columns: list[str]) -> list[dict]:
@@ -53,10 +68,11 @@ def run(df: pd.DataFrame, model, feature_columns: list[str]) -> list[dict]:
     tab_cols = tabular_part(feature_columns)
     store = EntityStore()
     pre = df[train_m | val_m]
-    ref = _replay_rows(pre, store, model, feature_columns, tab_cols, val_m[pre.index].to_numpy())
+    ref = _replay_rows(pre, store, model, feature_columns, tab_cols, val_m[pre.index].to_numpy(),
+                       (pre["day"] // 7).to_numpy())
     test = df[test_m]
-    cur = _replay_rows(test, store, model, feature_columns, tab_cols, np.ones(len(test), bool))
     week = (test["day"] // 7).to_numpy()
+    cur = _replay_rows(test, store, model, feature_columns, tab_cols, np.ones(len(test), bool), week)
     y = test["isFraud"].to_numpy()
     out = []
     for w in np.unique(week):

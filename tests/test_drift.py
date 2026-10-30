@@ -51,3 +51,32 @@ def test_replay_on_fixture(raw_dir, tmp_path):
     assert n == len(rows) == int(test_m.sum())
     assert len({r["TransactionID"] for r in rows}) == n
     assert all(not any(isinstance(v, float) and math.isnan(v) for v in r.values()) for r in rows)
+
+
+def test_replay_batched_scores_equal_per_row_online_scores(raw_dir):
+    import importlib.util
+    from pathlib import Path
+
+    from fraudgraph.serve.app import feature_vector, tabular_part
+    from fraudgraph.serve.store import EntityStore
+    spec = importlib.util.spec_from_file_location(
+        "replay", Path(__file__).resolve().parent.parent / "scripts" / "replay.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    df = load_raw(raw_dir)
+    X = pd.concat([tabular_features(df), graph_features(df, entity_keys(df))], axis=1)
+    model = train_xgb(X, df["isFraud"], X, df["isFraud"], n_estimators=20)
+    cols = list(X.columns)
+    tab = tabular_part(cols)
+    want = np.asarray(df.index % 3 != 0)
+    batched = mod._replay_rows(df, EntityStore(), model, cols, tab, want, (df["day"] // 7).to_numpy())
+    store, per_row = EntityStore(), []
+    for rec, w in zip(df.to_dict("records"), want):
+        body = mod.txn_body(rec)
+        x = feature_vector(store, body, tab, cols)
+        if w:
+            per_row.append(float(model.predict_proba(x)[0, 1]))
+        store.observe(body)
+        store.ingest_label(body["TransactionID"], bool(rec["isFraud"]))
+    assert len(batched) == want.sum()
+    np.testing.assert_allclose(batched, per_row, rtol=0, atol=1e-7)
