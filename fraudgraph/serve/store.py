@@ -25,7 +25,7 @@ see it. Per (type, value) the store keeps sorted label-day lists (bisect), so fe
 O(log n) per entity and never scans the event history.
 """
 from bisect import bisect_right, insort
-from collections import defaultdict
+from collections import defaultdict, deque
 
 import pandas as pd
 
@@ -53,22 +53,19 @@ class EntityStore:
         self._prior_n: dict[tuple[str, str], int] = defaultdict(int)
         self._labeled_days: dict[tuple[str, str], list[int]] = defaultdict(list)
         self._fraud_days: dict[tuple[str, str], list[int]] = defaultdict(list)
-        self._pending: list[tuple[int, dict]] = []  # (TransactionDT, entity values)
+        self._pending: deque[tuple[int, dict]] = deque()  # (TransactionDT, entity values)
         self._values_by_txn: dict[int, dict[str, str | None]] = {}
         self._day_by_txn: dict[int, int] = {}
         self._labeled: set[int] = set()
         self._last_dt: int | None = None
 
     def _flush_before(self, dt: int) -> None:
-        keep = []
-        for pdt, vals in self._pending:
-            if pdt < dt:
-                for t, v in vals.items():
-                    if v is not None:
-                        self._prior_n[(t, v)] += 1
-            else:
-                keep.append((pdt, vals))
-        self._pending = keep
+        # _pending is in DT order (features() refuses an earlier DT), so pop from the front.
+        while self._pending and self._pending[0][0] < dt:
+            _, vals = self._pending.popleft()
+            for t, v in vals.items():
+                if v is not None:
+                    self._prior_n[(t, v)] += 1
 
     def features(self, txn: dict) -> dict[str, float]:
         dt = int(txn["TransactionDT"])

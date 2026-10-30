@@ -147,3 +147,23 @@ def test_duplicate_observe_raises():
     s.observe(_txn(1, 0))
     with pytest.raises(ValueError, match="already observed"):
         s.observe(_txn(1, 5))
+
+
+def test_features_cost_does_not_grow_with_pending_same_dt():
+    import time
+    from statistics import median
+
+    def cost(n):
+        s = EntityStore()
+        vals = {"card": "c", "email": "e", "device": "d", "addr": "a"}
+        s.features(_txn(0, 1000))
+        s._pending.extend((1000, vals) for _ in range(n))  # n same-DT observed txns
+        probe = _txn(10**9, 1000)
+        reps = []
+        for _ in range(7):
+            t0 = time.perf_counter()
+            s.features(probe)
+            reps.append(time.perf_counter() - t0)
+        return median(reps)
+
+    assert cost(200_000) / cost(1_000) < 3

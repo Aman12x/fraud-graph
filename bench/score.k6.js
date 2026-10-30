@@ -1,6 +1,8 @@
 // Ramp 1 -> 50 VUs over 60 s against POST /score with test-split rows.
-// Payloads cycle; each iteration gets a unique TransactionID and a non-decreasing TransactionDT
-// (the API 409s on repeats and earlier DTs). Override: BASE_URL, DURATION (seconds), MAX_VUS.
+// Payloads cycle; each iteration gets a unique TransactionID; every request uses ONE constant
+// TransactionDT (the API 409s on repeats and earlier DTs, and concurrent VUs arrive out of order).
+// CAVEAT: a constant DT means every request sees prior_n=0, so the latency excludes real
+// neighbour-count work; the README must say so when quoting it. Override: BASE_URL, DURATION (seconds), MAX_VUS.
 import http from 'k6/http';
 import { check } from 'k6';
 import { SharedArray } from 'k6/data';
