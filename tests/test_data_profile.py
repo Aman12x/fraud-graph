@@ -3,7 +3,7 @@ from pathlib import Path
 
 from fraudgraph.data import load_raw
 
-SPEC = importlib.util.spec_from_file_location("profile_script", Path(__file__).resolve().parent.parent / "scripts" / "profile.py")
+SPEC = importlib.util.spec_from_file_location("data_profile_script", Path(__file__).resolve().parent.parent / "scripts" / "data_profile.py")
 prof = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(prof)
 

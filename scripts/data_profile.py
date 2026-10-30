@@ -11,8 +11,9 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def run(df: pd.DataFrame) -> dict:
-    results.write_result("data_profile", profile(df))
-    return profile(df)
+    prof = profile(df)
+    results.write_result("data_profile", prof)
+    return prof
 
 
 if __name__ == "__main__":

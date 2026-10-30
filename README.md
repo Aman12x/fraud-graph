@@ -37,7 +37,7 @@ Scoring latency: not run.
 
 Install with `uv sync`. Each script writes a JSON file into `results/`.
 
-- Data profile, after download: `uv run python scripts/profile.py` writes `results/data_profile.json`.
+- Data profile, after download: `uv run python scripts/data_profile.py` writes `results/data_profile.json`.
 
 - Tier 1, XGBoost with and without graph features: `uv run python scripts/run_tier1.py`
 - Tier 2, heterogeneous GNN: `uv run python scripts/run_gnn.py`
