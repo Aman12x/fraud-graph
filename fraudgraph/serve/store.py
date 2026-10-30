@@ -3,7 +3,7 @@
 Scoring loop for each live txn, in non-decreasing TransactionDT order:
     feats = store.features(txn)            # state strictly before txn["TransactionDT"]
     store.observe(txn)                     # after scoring
-    ...later: store.ingest_label(txn_id, is_fraud, day)
+    ...later: store.ingest_label(txn_id, is_fraud)
 
 Rules, identical to graph_features:
   prior_n     = observed same-value txns with a strictly smaller TransactionDT.
@@ -17,8 +17,9 @@ when features() is called for a txn with a strictly larger TransactionDT, so two
 same DT never see each other. features() refuses a DT earlier than the last one scored, since
 the buffer has already been flushed past it and the answer would leak later activity.
 
-Labels: `day` passed to ingest_label is the labeled txn's OWN day (TransactionDT // 86400),
-not the day the label arrived; visibility is by whole days, exactly the offline rule. Label
+Labels: observe() records each txn's OWN day (TransactionDT // 86400) and ingest_label uses
+that recorded day, not the day the label arrived; visibility is by whole days, exactly the
+offline rule. Observing a TransactionID twice raises ValueError. Label
 arrival order does not matter as long as each label is ingested before any txn that should
 see it. Per (type, value) the store keeps sorted label-day lists (bisect), so features() is
 O(log n) per entity and never scans the event history.
@@ -54,6 +55,7 @@ class EntityStore:
         self._fraud_days: dict[tuple[str, str], list[int]] = defaultdict(list)
         self._pending: list[tuple[int, dict]] = []  # (TransactionDT, entity values)
         self._values_by_txn: dict[int, dict[str, str | None]] = {}
+        self._day_by_txn: dict[int, int] = {}
         self._labeled: set[int] = set()
         self._last_dt: int | None = None
 
@@ -89,21 +91,33 @@ class EntityStore:
         return {c: out[c] for c in feature_columns()}
 
     def observe(self, txn: dict) -> None:
+        tid = int(txn["TransactionID"])
+        if tid in self._values_by_txn:
+            raise ValueError(f"TransactionID {tid} was already observed")
         vals = txn_entity_values(txn)
-        self._values_by_txn[int(txn["TransactionID"])] = vals
+        self._values_by_txn[tid] = vals
+        self._day_by_txn[tid] = _day(txn)
         self._pending.append((int(txn["TransactionDT"]), vals))
 
-    def ingest_label(self, txn_id: int, is_fraud: bool, day: int) -> None:
-        """Record txn_id's label; `day` is that txn's own day. Visible to day_i >= day + delay."""
+    def has_observed(self, txn_id: int) -> bool:
+        return int(txn_id) in self._values_by_txn
+
+    @property
+    def last_dt(self) -> int | None:
+        return self._last_dt
+
+    def ingest_label(self, txn_id: int, is_fraud: bool) -> None:
+        """Record txn_id's label. Visible to day_i >= (txn's own day) + delay."""
         txn_id = int(txn_id)
         if txn_id not in self._values_by_txn:
             raise KeyError(f"label for TransactionID {txn_id}, which was never observed")
         if txn_id in self._labeled:
             raise ValueError(f"TransactionID {txn_id} is already labeled")
         self._labeled.add(txn_id)
+        day = self._day_by_txn[txn_id]
         for t, v in self._values_by_txn[txn_id].items():
             if v is None:
                 continue
-            insort(self._labeled_days[(t, v)], int(day))
+            insort(self._labeled_days[(t, v)], day)
             if is_fraud:
-                insort(self._fraud_days[(t, v)], int(day))
+                insort(self._fraud_days[(t, v)], day)

@@ -33,14 +33,14 @@ def _replay(df, label_order="immediate"):
             due = [h for h in held if h[2] <= day - LABEL_DELAY_DAYS]
             held = [h for h in held if h[2] > day - LABEL_DELAY_DAYS]
             for k in rng.permutation(len(due)):
-                store.ingest_label(*due[k])
+                store.ingest_label(*due[k][:2])
                 ingested.append(due[k][0])
         rows.append(store.features(rec))
         store.observe(rec)
         if label_order == "shuffled":
             held.append((rec["TransactionID"], bool(y), day))
         else:
-            store.ingest_label(rec["TransactionID"], bool(y), day)
+            store.ingest_label(rec["TransactionID"], bool(y))
             ingested.append(rec["TransactionID"])
     return pd.DataFrame(rows, index=df.index), ingested
 
@@ -106,7 +106,7 @@ def test_label_delay_boundary():
     s = EntityStore()
     s.features(_txn(1, 5 * D))
     s.observe(_txn(1, 5 * D))
-    s.ingest_label(1, True, 5)
+    s.ingest_label(1, True)
     before = s.features(_txn(2, (5 + LABEL_DELAY_DAYS - 1) * D + D - 1))
     assert before["card_prior_fraud"] == 0 and before["card_prior_n"] == 1
     after = s.features(_txn(3, (5 + LABEL_DELAY_DAYS) * D))
@@ -116,15 +116,15 @@ def test_label_delay_boundary():
 
 def test_unknown_txn_label_raises():
     with pytest.raises(KeyError, match="never observed"):
-        EntityStore().ingest_label(42, True, 0)
+        EntityStore().ingest_label(42, True)
 
 
 def test_duplicate_label_raises():
     s = EntityStore()
     s.observe(_txn(1, 0))
-    s.ingest_label(1, False, 0)
+    s.ingest_label(1, False)
     with pytest.raises(ValueError, match="already labeled"):
-        s.ingest_label(1, True, 0)
+        s.ingest_label(1, True)
 
 
 def test_scoring_backwards_in_time_raises():
@@ -140,3 +140,10 @@ def test_render_component_numpy_floats():
     assert render_component(np.float64(100.0)) == "100"
     assert render_component(np.float32("nan")) == ""
     assert render_component(np.float32(1.5)) == "1.5"
+
+
+def test_duplicate_observe_raises():
+    s = EntityStore()
+    s.observe(_txn(1, 0))
+    with pytest.raises(ValueError, match="already observed"):
+        s.observe(_txn(1, 5))

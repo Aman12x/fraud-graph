@@ -1,3 +1,4 @@
+import torch  # noqa: F401  torch's OpenMP runtime must load before xgboost's, else torch training deadlocks
 import numpy as np
 import pandas as pd
 import pytest
