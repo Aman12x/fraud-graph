@@ -64,3 +64,24 @@ def test_run_gnn_on_fixture(raw_dir, tmp_path, monkeypatch):
     assert body["test"]["cost_at_val_threshold"]["threshold"] == body["val"]["best_cost"]["threshold"]
     assert "cost_at_val_threshold" not in body["val"]
     assert out["n_train"] == body["n_train"] > 0
+
+
+def test_run_gnn_nan_val_score_keeps_trained_weights(raw_dir, tmp_path, monkeypatch):
+    # val PR-AUC NaN on every epoch must not restore the untrained initial weights
+    spec = importlib.util.spec_from_file_location(
+        "run_gnn", Path(__file__).resolve().parent.parent / "scripts" / "run_gnn.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    monkeypatch.setattr(results, "RESULTS_DIR", tmp_path / "results")
+    monkeypatch.setattr(mod, "pr_auc", lambda y, s: float("nan"))
+    restored_is_trained = []
+
+    class Spy(mod.HeteroSAGE):
+        def load_state_dict(self, sd, *a, **k):
+            cur = self.state_dict()
+            restored_is_trained.append(all(torch.equal(cur[n], sd[n]) for n in sd))
+            return super().load_state_dict(sd, *a, **k)
+
+    monkeypatch.setattr(mod, "HeteroSAGE", Spy)
+    mod.run(load_raw(raw_dir), epochs=1)
+    assert restored_is_trained == [True]

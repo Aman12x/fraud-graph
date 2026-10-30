@@ -48,7 +48,7 @@ def run(df: pd.DataFrame, epochs: int = 20, lr: float = 1e-3, patience: int = 3,
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     y_val = y[prep.val.to_numpy()]
 
-    best, best_state, bad = -1.0, copy.deepcopy(model.state_dict()), 0
+    best, best_state, bad = -1.0, None, 0
     for _ in range(epochs):
         model.train()
         for b in train_l:
@@ -58,7 +58,7 @@ def run(df: pd.DataFrame, epochs: int = 20, lr: float = 1e-3, patience: int = 3,
             loss.backward()
             opt.step()
         score = pr_auc(y_val, predict(model, val_l))
-        if score > best:
+        if best_state is None or score > best:   # first epoch always kept, never untrained
             best, best_state, bad = score, copy.deepcopy(model.state_dict()), 0
         else:
             bad += 1
