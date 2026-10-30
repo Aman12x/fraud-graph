@@ -7,6 +7,7 @@ dependencies = [
     "pandas==2.2.3",
     "pyarrow==18.1.0",
     "scikit-learn>=1.9.1",
+    "xgboost>=3.2.0",
 ]
 
 [dependency-groups]
@@ -18,7 +19,7 @@ dev = [
 testpaths = ["tests"]
 
 [tool.setuptools]
-packages = ["fraudgraph"]
+packages = ["fraudgraph", "fraudgraph.models"]
 
 [build-system]
 requires = ["setuptools>=68"]
