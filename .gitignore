@@ -3,3 +3,4 @@ data/
 *.pt
 *.ubj
 __pycache__/
+.superpowers/
