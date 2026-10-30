@@ -23,24 +23,25 @@ def tabular_features(df: pd.DataFrame, columns: list[str] | None = None) -> pd.D
     reindexed to `columns` and requested numeric columns are coerced to float, so one
     row's values equal that row's values in the full-frame output.
     """
-    out = pd.DataFrame(index=df.index)
+    # Whole-block operations only: building ~400 columns one insert (or one Series lookup)
+    # at a time cost ~40 ms per 1-row call and a PerformanceWarning per insert.
     amt = df["TransactionAmt"].astype(float)
-    out["TransactionAmt"] = amt
-    out["log_amt"] = np.log1p(amt)
-    out["hour"] = (df["TransactionDT"] // 3600) % 24
-    numeric = [c for c in df.columns
-               if c not in _EXCLUDED and pd.api.types.is_numeric_dtype(df[c])
-               and not pd.api.types.is_bool_dtype(df[c])]
-    for c in sorted(numeric):
-        out[c] = df[c].astype(float)
-    for c in CATEGORICAL:
-        if c in df.columns:
-            out[c] = [_hash_code(v) for v in df[c].tolist()]
-        else:
-            out[c] = -1
+    head = pd.DataFrame({"TransactionAmt": amt, "log_amt": np.log1p(amt),
+                         "hour": (df["TransactionDT"] // 3600) % 24}, index=df.index)
+    numeric = sorted(c for c, d in df.dtypes.items()
+                     if c not in _EXCLUDED and pd.api.types.is_numeric_dtype(d)
+                     and not pd.api.types.is_bool_dtype(d))
+    blocks = [head, df[numeric].astype(float)]
+    blocks.append(pd.DataFrame(
+        {c: [_hash_code(v) for v in df[c].tolist()] if c in df.columns else -1 for c in CATEGORICAL},
+        index=df.index))
     if columns is not None:
-        for c in columns:
-            if c not in out.columns and c in df.columns and c not in _EXCLUDED:
-                out[c] = pd.to_numeric(df[c], errors="coerce").astype(float)
+        have = {*head.columns, *numeric, *CATEGORICAL}
+        extra = [c for c in dict.fromkeys(columns)
+                 if c not in have and c in df.columns and c not in _EXCLUDED]
+        if extra:
+            blocks.append(df[extra].apply(pd.to_numeric, errors="coerce").astype(float))
+    out = pd.concat(blocks, axis=1)
+    if columns is not None:
         out = out.reindex(columns=columns)
     return out

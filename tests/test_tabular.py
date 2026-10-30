@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 from fraudgraph.data import load_raw
 from fraudgraph.tabular import CATEGORICAL, tabular_features
@@ -55,3 +56,40 @@ def test_single_row_with_columns_equals_full_frame(raw_dir):
         # an all-None numeric value arrives as object dtype in a 1-row slice
         one = one.astype({c: object for c in ("card2", "addr1")})
         assert_frame_equal(tabular_features(one, columns=cols), full.loc[[idx]])
+
+
+def _wide_payload(n_numeric=400, n_null=10):
+    rng = np.random.default_rng(0)
+    names = [f"V{i}" for i in range(n_numeric)]
+    full = pd.DataFrame({"TransactionID": [1, 2], "TransactionDT": [100, 200],
+                         "TransactionAmt": [12.5, 3.0], **{c: rng.normal(size=2) for c in names}})
+    cols = list(tabular_features(full).columns)
+    # the last n_null values arrive as None, i.e. object dtype in a 1-row frame (the columns= branch)
+    body = {"TransactionID": 1, "TransactionDT": 100, "TransactionAmt": 12.5,
+            **{c: float(rng.normal()) for c in names[:-n_null]}, **{c: None for c in names[-n_null:]}}
+    return pd.DataFrame([body]), cols
+
+
+def test_wide_single_row_emits_no_performance_warning():
+    import warnings
+    one, cols = _wide_payload()
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        out = tabular_features(one, columns=cols)
+    assert list(out.columns) == cols and out.shape == (1, len(cols))
+    assert np.isnan(out["V399"].iloc[0]) and out["V0"].iloc[0] == one["V0"].iloc[0]
+
+
+def test_wide_cost_does_not_grow_per_column():
+    # one block build, not one insert per column: 400 columns cost far less than 10x 40 columns
+    import time
+
+    def per_call(n):
+        one, cols = _wide_payload(n, n_null=2)
+        tabular_features(one, columns=cols)
+        t = time.perf_counter()
+        for _ in range(20):
+            tabular_features(one, columns=cols)
+        return time.perf_counter() - t
+
+    assert per_call(400) < 5 * per_call(40)
