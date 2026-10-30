@@ -28,7 +28,7 @@ filterwarnings = [
 ]
 
 [tool.setuptools]
-packages = ["fraudgraph", "fraudgraph.models", "fraudgraph.gnn"]
+packages = ["fraudgraph", "fraudgraph.models", "fraudgraph.gnn", "fraudgraph.serve"]
 
 # CPU-only torch (no CUDA wheels on linux) and pyg-lib from PyG's flat wheel index.
 # torch 2.8.0 + pyg-lib 0.6.0+pt28 have wheels for both macOS arm64 and linux x86_64.

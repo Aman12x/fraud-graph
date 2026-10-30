@@ -5,6 +5,7 @@ for every component so offline and online keys are byte-identical.
 """
 import math
 
+import numpy as np
 import pandas as pd
 
 ENTITY_TYPES = ("card", "email", "device", "addr")
@@ -14,11 +15,17 @@ SEP = "|"
 
 
 def render_component(v) -> str:
-    """One key component as text: null -> "", integral float -> int ("100.0" -> "100")."""
-    if v is None or (isinstance(v, float) and math.isnan(v)) or v is pd.NA:
+    """One key component as text: null -> "", integral float -> int ("100.0" -> "100").
+
+    numpy floats of any width count as floats, so np.float32(100.0) -> "100" and NaN -> "".
+    """
+    if v is None or v is pd.NA:
         return ""
-    if isinstance(v, float) and v.is_integer():
-        return str(int(v))
+    if isinstance(v, (float, np.floating)):
+        if math.isnan(v):
+            return ""
+        if float(v).is_integer():
+            return str(int(v))
     return str(v)
 
 
