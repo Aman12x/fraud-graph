@@ -127,7 +127,10 @@ def create_app(model, store: EntityStore, feature_columns_: list[str]) -> FastAP
 
 
 def build_app_from_env() -> FastAPI:
-    path = Path(os.environ["FRAUDGRAPH_MODEL"])
+    env = os.environ.get("FRAUDGRAPH_MODEL")
+    if not env:
+        raise RuntimeError("set FRAUDGRAPH_MODEL=models/xgb_graph.ubj")
+    path = Path(env)
     cols = json.loads(path.with_name(path.stem + ".features.json").read_text())
     return create_app(load_model(path), EntityStore(), cols)
 

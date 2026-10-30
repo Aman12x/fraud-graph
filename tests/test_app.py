@@ -127,3 +127,12 @@ def test_module_import_needs_no_env(monkeypatch, setup, tmp_path):
     monkeypatch.setattr(m, "_app", None)
     c = TestClient(m.app)
     assert c.post("/score", json=BASE).status_code == 200
+
+
+def test_lazy_app_without_env_says_what_to_set(monkeypatch):
+    import fraudgraph.serve.app as m
+    monkeypatch.delenv("FRAUDGRAPH_MODEL", raising=False)
+    monkeypatch.setattr(m, "_app", None)
+    with pytest.raises(RuntimeError, match="set FRAUDGRAPH_MODEL=models/xgb_graph.ubj"):
+        m.app
+    assert hasattr(m, "create_app") and not hasattr(m, "nope")
