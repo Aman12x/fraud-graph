@@ -12,15 +12,17 @@ latency benchmark.
 
 Every number below is rendered from `results/*.json` by `scripts/report.py`. Nothing here is typed by hand.
 
+The headline cost applies the threshold that minimised expected cost on the validation weeks to the test weeks. The oracle column picks its threshold on the test labels themselves, so it is the floor for that model's scores, reachable only with hindsight; it is shown only for comparison.
+
 <!-- results:start -->
 Data profile: not run.
 
-| model | test PR-AUC | recall @ 1% FPR | best expected cost |
-|---|---|---|---|
-| xgb_base | not run | not run | not run |
-| xgb_graph | not run | not run | not run |
-| gnn_sage | not run | not run | not run |
-| seq_transformer | not run | not run | not run |
+| model | test PR-AUC | recall @ 1% FPR | expected cost (val-chosen threshold) | oracle cost (threshold tuned on test; not achievable) |
+|---|---|---|---|---|
+| xgb_base | not run | not run | not run | not run |
+| xgb_graph | not run | not run | not run | not run |
+| gnn_sage | not run | not run | not run | not run |
+| seq_transformer | not run | not run | not run | not run |
 
 Drift: not run.
 

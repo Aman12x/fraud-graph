@@ -66,11 +66,12 @@ def run(df: pd.DataFrame, epochs: int = 20, lr: float = 1e-3, patience: int = 3,
                 break
     model.load_state_dict(best_state)
 
-    ev = {}
+    ev, thr = {}, None
     for part, mask, loader in (("val", prep.val, val_l), ("test", prep.test, test_l)):
-        m = mask.to_numpy()
+        m = mask.to_numpy()            # val first: its cost-optimal threshold is applied to test
         ev[part] = evaluate(df.loc[m, "isFraud"], predict(model, loader),
-                            df.loc[m, "TransactionAmt"])
+                            df.loc[m, "TransactionAmt"], threshold=thr)
+        thr = ev["val"]["best_cost"]["threshold"]
     payload = {"model": "gnn_sage", "features": prep.tab_cols,
                "n_train": int(prep.train_fit.sum()), **ev}
     results.write_result("gnn_sage", payload)

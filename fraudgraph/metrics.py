@@ -55,10 +55,16 @@ def best_cost(y, s, amt) -> dict:
     return {"threshold": thr, "cost": expected_cost(y, s, amt, thr)}
 
 
-def evaluate(y, s, amt) -> dict:
-    return {
+def evaluate(y, s, amt, threshold: float | None = None) -> dict:
+    """Metrics on one split. Pass `threshold` (chosen on validation) to add the honest cost:
+    `cost_at_val_threshold`. `best_cost` picks its threshold on these same labels."""
+    out = {
         "pr_auc": pr_auc(y, s),
         "recall_at_fpr": recall_at_fpr(y, s),
         "best_cost": best_cost(y, s, amt),
         "cost_at_0.5": expected_cost(y, s, amt, 0.5),
     }
+    if threshold is not None:
+        out["cost_at_val_threshold"] = {"threshold": float(threshold),
+                                        "cost": expected_cost(y, s, amt, threshold)}
+    return out

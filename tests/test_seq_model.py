@@ -75,4 +75,6 @@ def test_run_seq_on_fixture(raw_dir, tmp_path, monkeypatch):
     for k in ("model", "features", "n_train", "val", "test"):
         assert k in body
     assert body["model"] == "seq_transformer" and "pr_auc" in body["test"]
+    assert body["test"]["cost_at_val_threshold"]["threshold"] == body["val"]["best_cost"]["threshold"]
+    assert "cost_at_val_threshold" not in body["val"]
     assert out["n_train"] == body["n_train"] > 0

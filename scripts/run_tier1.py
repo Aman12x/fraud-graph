@@ -31,10 +31,11 @@ def run(df: pd.DataFrame, models_dir: Path | None = None, n_estimators: int = 20
         cols = list(X.columns)
         m = train_xgb(X[train_fit], df.loc[train_fit, "isFraud"],
                       X[val_m], df.loc[val_m, "isFraud"], n_estimators=n_estimators)
-        ev = {}
-        for part, mask in (("val", val_m), ("test", test_m)):
+        ev, thr = {}, None
+        for part, mask in (("val", val_m), ("test", test_m)):  # val first: it picks test's threshold
             p = m.predict_proba(X[mask])[:, 1]
-            ev[part] = evaluate(df.loc[mask, "isFraud"], p, df.loc[mask, "TransactionAmt"])
+            ev[part] = evaluate(df.loc[mask, "isFraud"], p, df.loc[mask, "TransactionAmt"], threshold=thr)
+            thr = ev["val"]["best_cost"]["threshold"]
         payload = {"model": name, "features": cols, "n_train": int(train_fit.sum()), **ev}
         results.write_result(name, payload)
         save_model(m, models_dir / f"{name}.ubj")

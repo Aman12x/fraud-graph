@@ -26,15 +26,17 @@ def _profile(r: dict) -> str:
 
 
 def _models(r: dict) -> list[str]:
-    lines = ["| model | test PR-AUC | recall @ 1% FPR | best expected cost |", "|---|---|---|---|"]
+    lines = ["| model | test PR-AUC | recall @ 1% FPR | expected cost (val-chosen threshold) "
+             "| oracle cost (threshold tuned on test; not achievable) |", "|---|---|---|---|---|"]
     for name in MODELS:
         m = r.get(name)
         if m is None:
-            lines.append(f"| {name} | {NOT_RUN} | {NOT_RUN} | {NOT_RUN} |")
+            lines.append(f"| {name} | {NOT_RUN} | {NOT_RUN} | {NOT_RUN} | {NOT_RUN} |")
             continue
         t = m["test"]
+        val_thr = (t.get("cost_at_val_threshold") or {}).get("cost")
         lines.append(f"| {name} | {_rate(t.get('pr_auc'))} | {_rate(t['recall_at_fpr']['recall'])} "
-                     f"| {_cost(t['best_cost']['cost'])} |")
+                     f"| {_cost(val_thr)} | {_cost(t['best_cost']['cost'])} |")
     return lines
 
 

@@ -59,3 +59,8 @@ def test_best_cost_equals_reference_on_random_data():
 def test_best_cost_all_negative_flags_nothing():
     assert best_cost([0, 0], [0.2, 0.7], [10.0, 10.0]) == {"threshold": float("inf"), "cost": 0.0}
 
+
+def test_evaluate_at_given_threshold():
+    e = evaluate(Y, S, AMT, threshold=0.7)
+    assert e["cost_at_val_threshold"] == {"threshold": 0.7, "cost": 45.0}
+    assert "cost_at_val_threshold" not in evaluate(Y, S, AMT)

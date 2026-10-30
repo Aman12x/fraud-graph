@@ -82,10 +82,11 @@ def run(df: pd.DataFrame, epochs: int = 20, lr: float = 1e-3, patience: int = 3,
                 break
     model.load_state_dict(best_state)
 
-    ev = {}
-    for part, rows in (("val", val_rows), ("test", test_rows)):
+    ev, thr = {}, None
+    for part, rows in (("val", val_rows), ("test", test_rows)):  # val first: it picks test's threshold
         ev[part] = evaluate(df["isFraud"].iloc[rows], predict(model, X, idx, gap, rows),
-                            df["TransactionAmt"].iloc[rows])
+                            df["TransactionAmt"].iloc[rows], threshold=thr)
+        thr = ev["val"]["best_cost"]["threshold"]
     payload = {"model": "seq_transformer", "features": prep.tab_cols,
                "n_train": int(fit.sum()), **ev}
     results.write_result("seq_transformer", payload)
