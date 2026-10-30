@@ -40,3 +40,18 @@ def test_columns_reindex(raw_dir):
     assert np.isnan(out["card2"].iloc[0]) and np.isnan(out["addr1"].iloc[0])
     extra = tabular_features(df.iloc[[0]], columns=["log_amt", "nonexistent"])
     assert list(extra.columns) == ["log_amt", "nonexistent"] and np.isnan(extra["nonexistent"].iloc[0])
+
+
+def test_single_row_with_columns_equals_full_frame(raw_dir):
+    from pandas.testing import assert_frame_equal
+
+    df = load_raw(raw_dir)
+    full = tabular_features(df)
+    cols = list(full.columns)
+    nan_rows = df.index[df.card2.isna() | df.addr1.isna()][:2].tolist()
+    assert nan_rows, "fixture must contain NaN numerics"
+    for idx in [df.index[0], df.index[50], *nan_rows]:
+        one = df.loc[[idx]]
+        # an all-None numeric value arrives as object dtype in a 1-row slice
+        one = one.astype({c: object for c in ("card2", "addr1")})
+        assert_frame_equal(tabular_features(one, columns=cols), full.loc[[idx]])

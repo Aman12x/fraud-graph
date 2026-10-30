@@ -15,6 +15,14 @@ def _hash_code(v) -> int:
 
 
 def tabular_features(df: pd.DataFrame, columns: list[str] | None = None) -> pd.DataFrame:
+    """Fit-free features for each row of df.
+
+    ONLINE SCORING MUST PASS `columns=` (the training column list). Without it the
+    numeric feature set depends on which columns the frame has (and an all-None
+    numeric column arrives as object dtype and is dropped). With it, the output is
+    reindexed to `columns` and requested numeric columns are coerced to float, so one
+    row's values equal that row's values in the full-frame output.
+    """
     out = pd.DataFrame(index=df.index)
     amt = df["TransactionAmt"].astype(float)
     out["TransactionAmt"] = amt
@@ -24,12 +32,15 @@ def tabular_features(df: pd.DataFrame, columns: list[str] | None = None) -> pd.D
                if c not in _EXCLUDED and pd.api.types.is_numeric_dtype(df[c])
                and not pd.api.types.is_bool_dtype(df[c])]
     for c in sorted(numeric):
-        out[c] = df[c]
+        out[c] = df[c].astype(float)
     for c in CATEGORICAL:
         if c in df.columns:
             out[c] = [_hash_code(v) for v in df[c].tolist()]
         else:
             out[c] = -1
     if columns is not None:
+        for c in columns:
+            if c not in out.columns and c in df.columns and c not in _EXCLUDED:
+                out[c] = pd.to_numeric(df[c], errors="coerce").astype(float)
         out = out.reindex(columns=columns)
     return out
