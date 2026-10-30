@@ -35,11 +35,24 @@ def expected_cost(y, s, amt, threshold: float) -> float:
 
 
 def best_cost(y, s, amt) -> dict:
+    """Cheapest threshold over every unique score plus inf (flag nothing), on these labels.
+
+    An oracle when called on the evaluation set itself: report it beside, never instead of,
+    the cost at a threshold chosen on validation. O(n log n): one sort, then cumulative sums
+    of row counts and fraud amounts below each candidate. Ties go to the lowest threshold.
+    """
+    y = np.asarray(y).astype(bool)
     s = np.asarray(s, dtype=float)
-    cands = np.concatenate([np.unique(s), [np.inf]])  # inf = flag nothing
-    costs = [expected_cost(y, s, amt, t) for t in cands]
+    amt = np.asarray(amt, dtype=float)
+    uniq, inv = np.unique(s, return_inverse=True)
+    below_n = np.concatenate([[0], np.cumsum(np.bincount(inv, minlength=len(uniq)))])
+    below_fraud = np.concatenate([[0.0], np.cumsum(np.bincount(inv, weights=amt * y,
+                                                               minlength=len(uniq)))])
+    # candidate j < len(uniq) flags s >= uniq[j]; the last candidate (inf) flags nothing
+    costs = REVIEW_COST * (len(s) - below_n) + below_fraud
     i = int(np.argmin(costs))
-    return {"threshold": float(cands[i]), "cost": float(costs[i])}
+    thr = float(uniq[i]) if i < len(uniq) else float(np.inf)
+    return {"threshold": thr, "cost": expected_cost(y, s, amt, thr)}
 
 
 def evaluate(y, s, amt) -> dict:

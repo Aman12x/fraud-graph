@@ -35,3 +35,27 @@ def test_evaluate_shape():
     assert set(e) == {"pr_auc", "recall_at_fpr", "best_cost", "cost_at_0.5"}
     assert e["pr_auc"] == pr_auc(Y, S)
     assert e["cost_at_0.5"] == 15.0
+
+
+def _best_cost_reference(y, s, amt):
+    # the original O(n^2) implementation, kept as the equivalence oracle
+    s = np.asarray(s, dtype=float)
+    cands = np.concatenate([np.unique(s), [np.inf]])
+    costs = [expected_cost(y, s, amt, t) for t in cands]
+    i = int(np.argmin(costs))
+    return {"threshold": float(cands[i]), "cost": float(costs[i])}
+
+
+def test_best_cost_equals_reference_on_random_data():
+    rng = np.random.default_rng(7)
+    for trial in range(200):
+        n = int(rng.integers(1, 60))
+        y = rng.random(n) < rng.uniform(0, 0.6)
+        s = np.round(rng.random(n), int(rng.integers(1, 3)))   # many tied scores
+        amt = rng.integers(0, 40, n).astype(float)              # integer amounts: exact sums, real ties
+        assert best_cost(y, s, amt) == _best_cost_reference(y, s, amt), trial
+
+
+def test_best_cost_all_negative_flags_nothing():
+    assert best_cost([0, 0], [0.2, 0.7], [10.0, 10.0]) == {"threshold": float("inf"), "cost": 0.0}
+
